@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0c10" />
+<title>glance</title>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #11151c;
+    --panel2: #0e1218;
+    --line: #1d242e;
+    --txt: #e6edf3;
+    --dim: #7d8a99;
+    --faint: #4b5663;
+    --up: #3fb950;
+    --down: #f85149;
+    --accent: #58a6ff;
+    --warn: #d29922;
+    --r: 8px;
+    --gap: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+    height: 100%;
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    gap: var(--gap);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  /* top bar */
+  .top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 2px;
+  }
+  .brand { font-weight: 700; letter-spacing: .14em; font-size: 12px; color: var(--txt); }
+  .brand span { color: var(--accent); }
+  .clock { color: var(--dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto 1fr;
+    gap: var(--gap);
+    min-height: 0;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 5px 7px;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card h2 {
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 3px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex: 0 0 auto;
+  }
+  .card h2 .meta { color: var(--faint); font-weight: 400; letter-spacing: .04em; }
+
+  /* spans */
+  .wx     { grid-column: 1 / 2; grid-row: 1; }
+  .btc    { grid-column: 2 / 3; grid-row: 1; }
+  .stocks { grid-column: 1 / 3; grid-row: 2; }
+  .sports { grid-column: 1 / 3; grid-row: 3; }
+  .news   { grid-column: 1 / 2; grid-row: 4; }
+  .fact   { grid-column: 2 / 3; grid-row: 4; }
+
+  /* weather */
+  .wx-main { display: flex; align-items: center; gap: 7px; }
+  .wx-temp { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .wx-emoji { font-size: 22px; line-height: 1; }
+  .wx-desc { color: var(--dim); font-size: 9.5px; }
+  .wx-row { display: flex; gap: 8px; margin-top: 3px; color: var(--dim); font-size: 9px; flex-wrap: wrap; }
+  .wx-row b { color: var(--txt); font-weight: 600; }
+
+  /* btc */
+  .btc-price { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .btc-sub { font-size: 9px; color: var(--dim); margin-top: 2px; }
+
+  /* stocks */
+  .tick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px; }
+  .tick { display: grid; grid-template-columns: auto 1fr auto; gap: 5px; align-items: baseline; padding: 1.5px 0; }
+  .tick .sym { font-weight: 700; font-size: 10px; }
+  .tick .px { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 9.5px; text-align: right; }
+  .tick .chg { font-variant-numeric: tabular-nums; font-size: 9.5px; font-weight: 600; min-width: 42px; text-align: right; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .flat { color: var(--dim); }
+
+  /* sports */
+  .sp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; }
+  .sp { display: flex; flex-direction: column; padding: 1px 0; min-width: 0; }
+  .sp .tm { font-weight: 700; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp .ln { font-size: 9px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp .live { color: var(--down); font-weight: 700; }
+  .badge { font-size: 8px; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+  .badge.w { background: rgba(63,185,80,.16); color: var(--up); }
+  .badge.l { background: rgba(248,81,73,.16); color: var(--down); }
+
+  /* news */
+  .news { overflow: hidden; }
+  .news .scroll { overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .ncat { margin-bottom: 3px; }
+  .ncat .lab { font-size: 7.5px; letter-spacing: .1em; color: var(--accent); text-transform: uppercase; font-weight: 700; }
+  .ncat a { display: block; color: var(--txt); text-decoration: none; font-size: 9px; line-height: 1.2; margin-top: 1px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ncat a .src { color: var(--faint); }
+
+  /* fact */
+  .fact { background: linear-gradient(160deg, #12171f, #0e1218); }
+  .fact .ftext { font-size: 10.5px; line-height: 1.35; color: var(--txt); font-family: ui-sans-serif, system-ui, sans-serif; }
+  .fact .fcat { font-size: 7.5px; letter-spacing: .1em; color: var(--warn); text-transform: uppercase; font-weight: 700; margin-bottom: 3px; }
+  .fact .fnav { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 4px; }
+  .fact button { background: var(--panel2); color: var(--dim); border: 1px solid var(--line); border-radius: 5px;
+                 font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .fact button:active { background: var(--line); }
+  .fact .dots { font-size: 8px; color: var(--faint); }
+
+  .err { color: var(--down); font-size: 9px; }
+  .load { color: var(--faint); font-size: 9px; }
+  a { color: inherit; }
+  /* scrollbars (only the news inner list may scroll) */
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">at·a·<span>glance</span></div>
+    <div class="clock" id="clock"></div>
+  </div>
+
+  <div class="grid">
+    <section class="card wx">
+      <h2>Weather <span class="meta">97062</span></h2>
+      <div id="wx"><div class="load">loading…</div></div>
+    </section>
+
+    <section class="card btc">
+      <h2>Bitcoin <span class="meta">USD</span></h2>
+      <div id="btc"><div class="load">loading…</div></div>
+    </section>
+
+    <section class="card stocks">
+      <h2>Markets <span class="meta" id="mkt-meta"></span></h2>
+      <div id="stocks"><div class="load">loading…</div></div>
+    </section>
+
+    <section class="card sports">
+      <h2>Sports</h2>
+      <div id="sports"><div class="load">loading…</div></div>
+    </section>
+
+    <section class="card news">
+      <h2>Headlines</h2>
+      <div class="scroll" id="news"><div class="load">loading…</div></div>
+    </section>
+
+    <section class="card fact">
+      <div class="fcat" id="fact-cat">did you know</div>
+      <div class="ftext" id="fact-text">…</div>
+      <div class="fnav">
+        <span class="dots" id="fact-dots"></span>
+        <button id="fact-next" aria-label="Next fact">next ›</button>
+      </div>
+    </section>
+  </div>
+
+<script>
+// ---------- clock ----------
+function tickClock() {
+  const d = new Date();
+  document.getElementById("clock").textContent =
+    d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
+    "  " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+tickClock(); setInterval(tickClock, 30000);
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const num = (n, d = 2) => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const cls = (v) => v == null ? "flat" : v > 0 ? "up" : v < 0 ? "down" : "flat";
+const sign = (v) => v == null ? "" : v > 0 ? "+" : "";
+
+// ---------- weather (direct to open-meteo, no key) ----------
+const WX_CODE = {
+  0:["☀️","Clear"],1:["🌤️","Mostly clear"],2:["⛅","Partly cloudy"],3:["☁️","Overcast"],
+  45:["🌫️","Fog"],48:["🌫️","Rime fog"],51:["🌦️","Light drizzle"],53:["🌦️","Drizzle"],55:["🌧️","Heavy drizzle"],
+  61:["🌧️","Light rain"],63:["🌧️","Rain"],65:["🌧️","Heavy rain"],66:["🌧️","Freezing rain"],67:["🌧️","Freezing rain"],
+  71:["🌨️","Light snow"],73:["🌨️","Snow"],75:["❄️","Heavy snow"],77:["❄️","Snow grains"],
+  80:["🌦️","Showers"],81:["🌧️","Showers"],82:["⛈️","Violent showers"],
+  85:["🌨️","Snow showers"],86:["🌨️","Snow showers"],95:["⛈️","Thunderstorm"],96:["⛈️","Storm + hail"],99:["⛈️","Storm + hail"]
+};
+async function loadWeather() {
+  // 97062 = Wilsonville/Tualatin OR area
+  const lat = 45.36, lon = -122.76;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+    `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FLos_Angeles&forecast_days=1`;
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    const c = j.current, day = j.daily;
+    const [emoji, desc] = WX_CODE[c.weather_code] || ["•", "—"];
+    $("wx").innerHTML = `
+      <div class="wx-main">
+        <div class="wx-emoji">${emoji}</div>
+        <div class="wx-temp">${Math.round(c.temperature_2m)}°</div>
+        <div>
+          <div class="wx-desc">${desc}</div>
+          <div class="wx-row"><span>feels <b>${Math.round(c.apparent_temperature)}°</b></span></div>
+        </div>
+      </div>
+      <div class="wx-row">
+        <span>H <b>${Math.round(day.temperature_2m_max[0])}°</b></span>
+        <span>L <b>${Math.round(day.temperature_2m_min[0])}°</b></span>
+        <span>💧<b>${day.precipitation_probability_max[0] ?? 0}%</b></span>
+        <span>💨<b>${Math.round(c.wind_speed_10m)}</b></span>
+        <span>RH <b>${Math.round(c.relative_humidity_2m)}%</b></span>
+      </div>`;
+  } catch (e) {
+    $("wx").innerHTML = `<div class="err">weather unavailable</div>`;
+  }
+}
+
+// ---------- bitcoin ----------
+async function loadBtc() {
+  try {
+    const r = await fetch("/api/btc");
+    const j = await r.json();
+    if (j.price == null) throw 0;
+    const chg = j.change24h;
+    $("btc").innerHTML = `
+      <div class="btc-price">$${num(j.price, 0)}</div>
+      <div class="btc-sub">${chg != null ? `<span class="${cls(chg)}">${sign(chg)}${num(chg,2)}% 24h</span>` : "spot price"}</div>`;
+  } catch (e) {
+    $("btc").innerHTML = `<div class="err">btc unavailable</div>`;
+  }
+}
+
+// ---------- stocks ----------
+async function loadStocks() {
+  try {
+    const r = await fetch("/api/stocks");
+    const j = await r.json();
+    if (!j.quotes || !j.quotes.length) throw 0;
+    let open = 0;
+    const rows = j.quotes.map((q) => {
+      if (q.price == null) {
+        return `<div class="tick"><span class="sym">${q.symbol}</span><span class="px">—</span><span class="chg flat">—</span></div>`;
+      }
+      const c = cls(q.changePct);
+      return `<div class="tick">
+        <span class="sym">${q.symbol}</span>
+        <span class="px">${num(q.price, q.price < 50 ? 2 : 2)}</span>
+        <span class="chg ${c}">${sign(q.changePct)}${num(q.changePct,2)}%</span>
+      </div>`;
+    }).join("");
+    $("stocks").innerHTML = `<div class="tick-grid">${rows}</div>`;
+  } catch (e) {
+    $("stocks").innerHTML = `<div class="err">markets unavailable</div>`;
+  }
+}
+
+// ---------- sports ----------
+function gameLine(g) {
+  if (!g) return `<span class="ln">—</span>`;
+  if (g.state === "in") {
+    return `<span class="ln live">● ${g.myScore}–${g.oppScore} ${g.vs.split(" ").slice(-1)[0]}</span>`;
+  }
+  if (g.state === "post") {
+    const b = g.result === "W" ? `<span class="badge w">W</span>` : g.result === "L" ? `<span class="badge l">L</span>` : "";
+    return `<span class="ln">${b} ${g.myScore}–${g.oppScore} ${g.vs}</span>`;
+  }
+  // pre
+  return `<span class="ln">${g.vs} · ${g.date}${g.time ? " " + g.time : ""}</span>`;
+}
+async function loadSports() {
+  try {
+    const r = await fetch("/api/sports");
+    const j = await r.json();
+    if (!j.teams) throw 0;
+    const rows = j.teams.map((t) =>
+      `<div class="sp"><span class="tm">${t.team}</span>${gameLine(t.game)}</div>`
+    ).join("");
+    $("sports").innerHTML = `<div class="sp-grid">${rows}</div>`;
+  } catch (e) {
+    $("sports").innerHTML = `<div class="err">sports unavailable</div>`;
+  }
+}
+
+// ---------- news ----------
+async function loadNews() {
+  try {
+    const r = await fetch("/api/news");
+    const j = await r.json();
+    if (!j.categories) throw 0;
+    const html = j.categories.map((c) => {
+      if (!c.items || !c.items.length) return "";
+      const links = c.items.map((it) =>
+        `<a href="${it.link}" target="_blank" rel="noopener">${it.title}${it.source ? ` <span class="src">· ${it.source}</span>` : ""}</a>`
+      ).join("");
+      return `<div class="ncat"><div class="lab">${c.key}</div>${links}</div>`;
+    }).join("");
+    $("news").innerHTML = html || `<div class="err">no headlines</div>`;
+  } catch (e) {
+    $("news").innerHTML = `<div class="err">news unavailable</div>`;
+  }
+}
+
+// ---------- rotating fact ----------
+const FACTS = [
+  ["Genetics", "Your body carries more bacterial cells than human ones — roughly 1.3 to 1, not the 10:1 ratio often quoted. The correction came from a 2016 recount."],
+  ["Space", "There may be a planet-sized diamond out there: white dwarf BPM 37093 is a crystallized carbon core nicknamed 'Lucy.' Its core is essentially one colossal diamond."],
+  ["Biology", "Octopuses edit their own RNA on the fly to adapt proteins to cold water — rewriting genetic instructions after transcription, something almost no other animal does at scale."],
+  ["Comp Sci", "The 'bug' in software is literal: in 1947 operators found a moth trapped in Harvard's Mark II relay computer and taped it into the logbook as the 'first actual case of bug being found.'"],
+  ["Science", "Glass isn't a slow-moving liquid. Medieval windows are thicker at the bottom because of how they were made, not because they 'flowed.' Glass is an amorphous solid."],
+  ["Genetics", "You share about 60% of your genes with a banana — not because you're half-fruit, but because core cellular machinery (energy, DNA repair) is ancient and conserved across life."],
+  ["Space", "A day on Venus is longer than its year: it takes ~243 Earth days to rotate once but only ~225 to orbit the Sun. And it spins backwards."],
+  ["Biology", "Your DNA, uncoiled from a single cell, stretches about 2 meters. Across all ~37 trillion cells, it would reach the Sun and back dozens of times."],
+  ["Comp Sci", "The first computer programmer was Ada Lovelace in the 1840s — she wrote an algorithm for Babbage's unbuilt Analytical Engine, a century before electronic computers existed."],
+  ["Science", "Hot water can freeze faster than cold under some conditions — the Mpemba effect. It's been observed for centuries but the mechanism is still debated."],
+  ["Genetics", "About 8% of the human genome is leftover viral DNA — ancient retroviruses that inserted themselves into our ancestors. One such gene is essential for forming the placenta."],
+  ["Space", "Neutron star material is so dense that a sugar-cube-sized piece would weigh about a billion tons — roughly the mass of all humanity compressed into a teaspoon."],
+  ["Biology", "Tardigrades can survive the vacuum of space, near-absolute-zero cold, and radiation doses thousands of times lethal to humans — by drying out into a glass-like suspended state."],
+  ["Comp Sci", "There are more possible games of chess (~10^120) than atoms in the observable universe (~10^80). No computer will ever brute-force them all."],
+  ["Science", "Helium was discovered on the Sun before it was found on Earth — spotted in 1868 as an unknown spectral line in sunlight, named after Helios."],
+];
+let factIdx = Math.floor(Math.random() * FACTS.length);
+function renderFact() {
+  const [cat, text] = FACTS[factIdx];
+  $("fact-cat").textContent = cat;
+  $("fact-text").textContent = text;
+  $("fact-dots").textContent = `${factIdx + 1} / ${FACTS.length}`;
+}
+$("fact-next").addEventListener("click", () => {
+  factIdx = (factIdx + 1) % FACTS.length;
+  renderFact();
+});
+renderFact();
+
+// ---------- boot (refresh on load only) ----------
+loadWeather(); loadBtc(); loadStocks(); loadSports(); loadNews();
+</script>
+</body>
+</html>

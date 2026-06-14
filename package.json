@@ -1,0 +1,7 @@
+{
+  "name": "at-a-glance",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Low-overhead personal info dashboard (weather, markets, BTC, sports, news, facts)."
+}
