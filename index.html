@@ -46,7 +46,11 @@
   }
   .brand { font-weight: 700; letter-spacing: .14em; font-size: 12px; color: var(--txt); }
   .brand span { color: var(--accent); }
+  .top-right { display: flex; align-items: center; gap: 8px; }
   .clock { color: var(--dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .zoom-controls { display: flex; align-items: center; gap: 4px; }
+  .zoom-controls button { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); font: inherit; cursor: pointer; }
+  .zoom-controls button:active { background: var(--line); }
 
   .grid {
     flex: 1;
@@ -155,7 +159,13 @@
 <body>
   <div class="top">
     <div class="brand">at·a·<span>glance</span></div>
-    <div class="clock" id="clock"></div>
+    <div class="top-right">
+      <div class="clock" id="clock"></div>
+      <div class="zoom-controls">
+        <button id="zoom-out" aria-label="Smaller font">−</button>
+        <button id="zoom-in" aria-label="Larger font">+</button>
+      </div>
+    </div>
   </div>
 
   <div class="grid">
@@ -208,6 +218,25 @@ function tickClock() {
     "  " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 tickClock(); setInterval(tickClock, 30000);
+
+// ---------- font zoom ----------
+const FONT_SIZE_KEY = "glanceFontSize";
+let fontSize = 11;
+function applyFontSize(size) {
+  fontSize = Math.max(8, Math.min(16, size));
+  document.documentElement.style.fontSize = `${fontSize}px`;
+  try { localStorage.setItem(FONT_SIZE_KEY, String(fontSize)); } catch (e) {}
+}
+function loadFontSize() {
+  try {
+    const stored = parseInt(localStorage.getItem(FONT_SIZE_KEY), 10);
+    if (!isNaN(stored)) applyFontSize(stored);
+  } catch (e) {}
+}
+
+loadFontSize();
+document.getElementById("zoom-in").addEventListener("click", () => applyFontSize(fontSize + 1));
+document.getElementById("zoom-out").addEventListener("click", () => applyFontSize(fontSize - 1));
 
 // ---------- helpers ----------
 const $ = (id) => document.getElementById(id);

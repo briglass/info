@@ -21,11 +21,37 @@ function getScoreValue(s) {
   return s;
 }
 
+function formatDateForScoreboard(date) {
+  return date.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+async function fetchScoreboardEvents(t, startDate, endDate) {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${t.sport}/${t.league}/scoreboard?dates=${startDate}-${endDate}`;
+  const r = await fetch(url, { headers: HEADERS });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return (j.events || []).filter((e) =>
+    e.competitions?.[0]?.competitors?.some((c) => c.team?.id === String(t.id))
+  );
+}
+
+async function fetchScoreboardFallback(t, now) {
+  const today = new Date(now);
+  const futureStart = formatDateForScoreboard(today);
+  const futureEnd = formatDateForScoreboard(new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000));
+  const fallbackStart = formatDateForScoreboard(new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000));
+  const fallbackEnd = formatDateForScoreboard(new Date(today.getTime() + 120 * 24 * 60 * 60 * 1000));
+
+  const primary = await fetchScoreboardEvents(t, futureStart, futureEnd);
+  if (primary.length) return primary;
+  return await fetchScoreboardEvents(t, fallbackStart, fallbackEnd);
+}
+
 function buildGame(event, myId, state) {
   const comp = event.competitions?.[0];
   if (!comp?.competitors?.length) return null;
-  const mine = comp.competitors.find(c => c.team?.id === String(myId));
-  const opp  = comp.competitors.find(c => c.team?.id !== String(myId));
+  const mine = comp.competitors.find((c) => c.team?.id === String(myId));
+  const opp = comp.competitors.find((c) => c.team?.id !== String(myId));
   if (!opp) return null;
   const vs = opp.team?.abbreviation || opp.team?.shortDisplayName || opp.team?.displayName || "?";
   if (state === "pre") {
@@ -34,7 +60,7 @@ function buildGame(event, myId, state) {
     const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
     return { state: "pre", vs, date, time };
   }
-  const myScore  = getScoreValue(mine?.score);
+  const myScore = getScoreValue(mine?.score);
   const oppScore = getScoreValue(opp?.score);
   if (state === "in") return { state: "in", vs, myScore, oppScore };
   const result = mine?.winner === true ? "W" : mine?.winner === false ? "L" : "";
@@ -51,30 +77,50 @@ async function fetchTeam(t) {
     const events = j.events || [];
     const now = Date.now();
 
-    // Find live game
-    const liveEvent = events.find(e => e.competitions?.[0]?.status?.type?.state === "in");
-    
-    // Find completed games
-    const completedEvents = events
-      .filter(e => e.competitions?.[0]?.status?.type?.completed || e.competitions?.[0]?.status?.type?.state === "post")
-      .sort((a, b) => new Date(b.date) - new Date(a.date)); // descending so index 0 is most recent
-      
-    // Find upcoming games
-    const upcomingEvents = events
-      .filter(e => e.competitions?.[0]?.status?.type?.state === "pre" && new Date(e.date).getTime() > now)
-      .sort((a, b) => new Date(a.date) - new Date(b.date)); // ascending so index 0 is next
+    const scheduleLive = events.find((e) => e.competitions?.[0]?.status?.type?.state === "in");
+    const scheduleCompleted = events
+      .filter((e) => e.competitions?.[0]?.status?.type?.completed || e.competitions?.[0]?.status?.type?.state === "post")
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const scheduleUpcoming = events
+      .filter((e) => e.competitions?.[0]?.status?.type?.state === "pre" && new Date(e.date).getTime() > now)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
 
     let recent = null;
     let upcoming = null;
 
-    if (liveEvent) {
-      recent = buildGame(liveEvent, myId, "in");
-    } else if (completedEvents.length) {
-      recent = buildGame(completedEvents[0], myId, "post");
+    if (scheduleLive) {
+      recent = buildGame(scheduleLive, myId, "in");
+    } else if (scheduleCompleted.length) {
+      recent = buildGame(scheduleCompleted[0], myId, "post");
     }
 
-    if (upcomingEvents.length) {
-      upcoming = buildGame(upcomingEvents[0], myId, "pre");
+    if (scheduleUpcoming.length) {
+      upcoming = buildGame(scheduleUpcoming[0], myId, "pre");
+    }
+
+    if (!recent || !upcoming) {
+      const fallbackEvents = await fetchScoreboardFallback(t, now);
+
+      if (!recent) {
+        const fallbackLive = fallbackEvents.find((e) => e.competitions?.[0]?.status?.type?.state === "in");
+        const fallbackCompleted = fallbackEvents
+          .filter((e) => e.competitions?.[0]?.status?.type?.completed || e.competitions?.[0]?.status?.type?.state === "post")
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+        if (fallbackLive) {
+          recent = buildGame(fallbackLive, myId, "in");
+        } else if (fallbackCompleted.length) {
+          recent = buildGame(fallbackCompleted[0], myId, "post");
+        }
+      }
+
+      if (!upcoming) {
+        const fallbackUpcoming = fallbackEvents
+          .filter((e) => e.competitions?.[0]?.status?.type?.state === "pre" && new Date(e.date).getTime() > now)
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        if (fallbackUpcoming.length) {
+          upcoming = buildGame(fallbackUpcoming[0], myId, "pre");
+        }
+      }
     }
 
     return { team: t.team, recent, upcoming };
