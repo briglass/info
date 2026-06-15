@@ -52,7 +52,7 @@
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto 1fr 1fr;
     gap: var(--gap);
     min-height: 0;
   }
@@ -83,8 +83,9 @@
   .btc    { grid-column: 2 / 3; grid-row: 1; }
   .stocks { grid-column: 1 / 3; grid-row: 2; }
   .sports { grid-column: 1 / 3; grid-row: 3; }
-  .news   { grid-column: 1 / 2; grid-row: 4; }
+  .news   { grid-column: 1 / 2; grid-row: 4 / 6; }
   .fact   { grid-column: 2 / 3; grid-row: 4; }
+  .wotd   { grid-column: 2 / 3; grid-row: 5; }
 
   /* weather */
   .wx-main { display: flex; align-items: center; gap: 7px; }
@@ -112,7 +113,8 @@
   .sp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; }
   .sp { display: flex; flex-direction: column; padding: 1px 0; min-width: 0; }
   .sp .tm { font-weight: 700; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sp .ln { font-size: 9px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp .ln { font-size: 9px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+  .sp .ln-upcoming { font-size: 8px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; margin-top: 1px; }
   .sp .live { color: var(--down); font-weight: 700; }
   .badge { font-size: 8px; padding: 0 3px; border-radius: 3px; font-weight: 700; }
   .badge.w { background: rgba(63,185,80,.16); color: var(--up); }
@@ -136,6 +138,12 @@
                  font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
   .fact button:active { background: var(--line); }
   .fact .dots { font-size: 8px; color: var(--faint); }
+
+  /* wotd */
+  .wotd { background: linear-gradient(160deg, #10161d, #0d1117); }
+  .wotd .w-title { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: lowercase; }
+  .wotd .w-meta { font-size: 8.5px; color: var(--faint); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
+  .wotd .w-def { font-size: 10px; line-height: 1.35; color: var(--txt); font-family: ui-sans-serif, system-ui, sans-serif; margin-top: 4.5px; }
 
   .err { color: var(--down); font-size: 9px; }
   .load { color: var(--faint); font-size: 9px; }
@@ -183,6 +191,11 @@
         <span class="dots" id="fact-dots"></span>
         <button id="fact-next" aria-label="Next fact">next ›</button>
       </div>
+    </section>
+
+    <section class="card wotd">
+      <h2>Word of the Day</h2>
+      <div id="wotd"><div class="load">loading…</div></div>
     </section>
   </div>
 
@@ -284,25 +297,31 @@ async function loadStocks() {
 }
 
 // ---------- sports ----------
-function gameLine(g) {
+function renderRecent(g) {
   if (!g) return `<span class="ln">—</span>`;
   if (g.state === "in") {
-    return `<span class="ln live">● ${g.myScore}–${g.oppScore} ${g.vs.split(" ").slice(-1)[0]}</span>`;
+    return `<span class="ln live">● ${g.myScore}–${g.oppScore} ${g.vs}</span>`;
   }
-  if (g.state === "post") {
-    const b = g.result === "W" ? `<span class="badge w">W</span>` : g.result === "L" ? `<span class="badge l">L</span>` : "";
-    return `<span class="ln">${b} ${g.myScore}–${g.oppScore} ${g.vs}</span>`;
-  }
-  // pre
-  return `<span class="ln">${g.vs} · ${g.date}${g.time ? " " + g.time : ""}</span>`;
+  const b = g.result === "W" ? `<span class="badge w">W</span>` : g.result === "L" ? `<span class="badge l">L</span>` : "";
+  return `<span class="ln">${b} ${g.myScore}–${g.oppScore} ${g.vs}</span>`;
 }
+
+function renderUpcoming(g) {
+  if (!g) return `<span class="ln-upcoming">—</span>`;
+  return `<span class="ln-upcoming">→ ${g.vs} · ${g.date}${g.time ? " " + g.time : ""}</span>`;
+}
+
 async function loadSports() {
   try {
     const r = await fetch("/api/sports");
     const j = await r.json();
     if (!j.teams) throw 0;
     const rows = j.teams.map((t) =>
-      `<div class="sp"><span class="tm">${t.team}</span>${gameLine(t.game)}</div>`
+      `<div class="sp">
+        <span class="tm">${t.team}</span>
+        ${renderRecent(t.recent)}
+        ${renderUpcoming(t.upcoming)}
+      </div>`
     ).join("");
     $("sports").innerHTML = `<div class="sp-grid">${rows}</div>`;
   } catch (e) {
@@ -330,38 +349,62 @@ async function loadNews() {
 }
 
 // ---------- rotating fact ----------
-const FACTS = [
-  ["Genetics", "Your body carries more bacterial cells than human ones — roughly 1.3 to 1, not the 10:1 ratio often quoted. The correction came from a 2016 recount."],
-  ["Space", "There may be a planet-sized diamond out there: white dwarf BPM 37093 is a crystallized carbon core nicknamed 'Lucy.' Its core is essentially one colossal diamond."],
-  ["Biology", "Octopuses edit their own RNA on the fly to adapt proteins to cold water — rewriting genetic instructions after transcription, something almost no other animal does at scale."],
-  ["Comp Sci", "The 'bug' in software is literal: in 1947 operators found a moth trapped in Harvard's Mark II relay computer and taped it into the logbook as the 'first actual case of bug being found.'"],
-  ["Science", "Glass isn't a slow-moving liquid. Medieval windows are thicker at the bottom because of how they were made, not because they 'flowed.' Glass is an amorphous solid."],
-  ["Genetics", "You share about 60% of your genes with a banana — not because you're half-fruit, but because core cellular machinery (energy, DNA repair) is ancient and conserved across life."],
-  ["Space", "A day on Venus is longer than its year: it takes ~243 Earth days to rotate once but only ~225 to orbit the Sun. And it spins backwards."],
-  ["Biology", "Your DNA, uncoiled from a single cell, stretches about 2 meters. Across all ~37 trillion cells, it would reach the Sun and back dozens of times."],
-  ["Comp Sci", "The first computer programmer was Ada Lovelace in the 1840s — she wrote an algorithm for Babbage's unbuilt Analytical Engine, a century before electronic computers existed."],
-  ["Science", "Hot water can freeze faster than cold under some conditions — the Mpemba effect. It's been observed for centuries but the mechanism is still debated."],
-  ["Genetics", "About 8% of the human genome is leftover viral DNA — ancient retroviruses that inserted themselves into our ancestors. One such gene is essential for forming the placenta."],
-  ["Space", "Neutron star material is so dense that a sugar-cube-sized piece would weigh about a billion tons — roughly the mass of all humanity compressed into a teaspoon."],
-  ["Biology", "Tardigrades can survive the vacuum of space, near-absolute-zero cold, and radiation doses thousands of times lethal to humans — by drying out into a glass-like suspended state."],
-  ["Comp Sci", "There are more possible games of chess (~10^120) than atoms in the observable universe (~10^80). No computer will ever brute-force them all."],
-  ["Science", "Helium was discovered on the Sun before it was found on Earth — spotted in 1868 as an unknown spectral line in sunlight, named after Helios."],
-];
-let factIdx = Math.floor(Math.random() * FACTS.length);
+let factsList = [];
+let factIdx = 0;
+
 function renderFact() {
-  const [cat, text] = FACTS[factIdx];
-  $("fact-cat").textContent = cat;
-  $("fact-text").textContent = text;
-  $("fact-dots").textContent = `${factIdx + 1} / ${FACTS.length}`;
+  if (!factsList.length) return;
+  const f = factsList[factIdx];
+  $("fact-cat").textContent = f.category || "did you know";
+  $("fact-text").textContent = f.text || "";
+  $("fact-dots").textContent = `${factIdx + 1} / ${factsList.length}`;
 }
+
 $("fact-next").addEventListener("click", () => {
-  factIdx = (factIdx + 1) % FACTS.length;
+  if (!factsList.length) return;
+  factIdx = (factIdx + 1) % factsList.length;
   renderFact();
 });
-renderFact();
+
+async function loadFacts() {
+  try {
+    const r = await fetch("/api/facts");
+    const j = await r.json();
+    if (j.facts && j.facts.length) {
+      factsList = j.facts;
+      factIdx = Math.floor(Math.random() * factsList.length);
+      renderFact();
+    } else {
+      throw 0;
+    }
+  } catch (e) {
+    $("fact-text").textContent = "Facts unavailable.";
+  }
+}
+
+// ---------- word of the day ----------
+async function loadWotd() {
+  try {
+    const r = await fetch("/api/wotd");
+    const j = await r.json();
+    if (!j.word) throw 0;
+    
+    const metaParts = [];
+    if (j.pronunciation) metaParts.push(j.pronunciation);
+    if (j.pos) metaParts.push(`<i>${j.pos}</i>`);
+    
+    $("wotd").innerHTML = `
+      <div class="w-title">${j.word}</div>
+      ${metaParts.length ? `<div class="w-meta">${metaParts.join(" &bull; ")}</div>` : ""}
+      <div class="w-def">${j.shortdef}</div>
+    `;
+  } catch (e) {
+    $("wotd").innerHTML = `<div class="err">word of the day unavailable</div>`;
+  }
+}
 
 // ---------- boot (refresh on load only) ----------
-loadWeather(); loadBtc(); loadStocks(); loadSports(); loadNews();
+loadWeather(); loadBtc(); loadStocks(); loadSports(); loadNews(); loadFacts(); loadWotd();
 </script>
 </body>
 </html>

@@ -45,33 +45,41 @@ async function fetchTeam(t) {
   try {
     const url = `https://site.api.espn.com/apis/site/v2/sports/${t.sport}/${t.league}/teams/${t.id}/schedule`;
     const r = await fetch(url, { headers: HEADERS });
-    if (!r.ok) return { team: t.team, game: null };
+    if (!r.ok) return { team: t.team, recent: null, upcoming: null };
     const j = await r.json();
     const myId = j.team?.id || t.id;
     const events = j.events || [];
     const now = Date.now();
-    const ms7 = 7 * 86400000;
-    const ms14 = 14 * 86400000;
 
-    const live = events.find(e => e.competitions?.[0]?.status?.type?.state === "in");
-    if (live) return { team: t.team, game: buildGame(live, myId, "in") };
+    // Find live game
+    const liveEvent = events.find(e => e.competitions?.[0]?.status?.type?.state === "in");
+    
+    // Find completed games
+    const completedEvents = events
+      .filter(e => e.competitions?.[0]?.status?.type?.completed || e.competitions?.[0]?.status?.type?.state === "post")
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); // descending so index 0 is most recent
+      
+    // Find upcoming games
+    const upcomingEvents = events
+      .filter(e => e.competitions?.[0]?.status?.type?.state === "pre" && new Date(e.date).getTime() > now)
+      .sort((a, b) => new Date(a.date) - new Date(b.date)); // ascending so index 0 is next
 
-    const posts = events
-      .filter(e => e.competitions?.[0]?.status?.type?.completed && now - new Date(e.date).getTime() < ms7)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    if (posts.length) return { team: t.team, game: buildGame(posts[0], myId, "post") };
+    let recent = null;
+    let upcoming = null;
 
-    const pres = events
-      .filter(e => {
-        const t = new Date(e.date).getTime();
-        return e.competitions?.[0]?.status?.type?.state === "pre" && t > now && t - now < ms14;
-      })
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-    if (pres.length) return { team: t.team, game: buildGame(pres[0], myId, "pre") };
+    if (liveEvent) {
+      recent = buildGame(liveEvent, myId, "in");
+    } else if (completedEvents.length) {
+      recent = buildGame(completedEvents[0], myId, "post");
+    }
 
-    return { team: t.team, game: null };
+    if (upcomingEvents.length) {
+      upcoming = buildGame(upcomingEvents[0], myId, "pre");
+    }
+
+    return { team: t.team, recent, upcoming };
   } catch {
-    return { team: t.team, game: null };
+    return { team: t.team, recent: null, upcoming: null };
   }
 }
 
